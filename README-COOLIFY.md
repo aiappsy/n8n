@@ -16,6 +16,7 @@ This repository is already configured for Coolify deployment with:
 - ✅ `Dockerfile` - Multi-stage production build
 - ✅ `docker-compose.yml` - Complete orchestration
 - ✅ `.env.example` - All environment variables documented
+- ✅ `coolify-quickstart.sh` - Interactive setup script
 - ✅ Health checks and proper networking
 
 ### 2. Fork or Clone This Repository
@@ -24,7 +25,16 @@ If you're deploying from this repository:
 ```bash
 git clone https://github.com/aiappsy/n8n.git
 cd n8n
+
+# Optional: Run the quickstart script to generate environment variables
+./coolify-quickstart.sh
 ```
+
+The quickstart script will:
+- Generate secure passwords and encryption keys
+- Configure your domain and webhook URLs
+- Set up basic authentication if desired
+- Create a ready-to-use .env file
 
 ### 3. Deploy on Coolify
 
