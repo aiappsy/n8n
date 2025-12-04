@@ -1,0 +1,114 @@
+# Dockerfile.build - Build n8n from source for Coolify
+# Use this if you want to build n8n from source code instead of using the pre-built image
+# WARNING: This requires significant build time and resources
+
+ARG NODE_VERSION=22.21.0
+
+# ==============================================================================
+# STAGE 1: Builder - Install dependencies and build
+# ==============================================================================
+FROM node:${NODE_VERSION}-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    openssh \
+    openssl \
+    python3 \
+    make \
+    g++ \
+    ca-certificates
+
+# Enable corepack for pnpm
+RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
+
+WORKDIR /build
+
+# Copy package files and install dependencies
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY patches ./patches/
+COPY packages ./packages/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the application using the official build script
+RUN pnpm build:deploy
+
+# ==============================================================================
+# STAGE 2: Runtime - Create production image
+# ==============================================================================
+FROM node:${NODE_VERSION}-alpine AS runtime
+
+ARG N8N_VERSION=snapshot
+ARG N8N_RELEASE_TYPE=stable
+
+ENV NODE_ENV=production
+ENV N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE}
+ENV SHELL=/bin/sh
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    git \
+    openssh \
+    openssl \
+    graphicsmagick \
+    tini \
+    tzdata \
+    ca-certificates \
+    libc6-compat \
+    libxml2 \
+    jq
+
+# Install fonts
+RUN apk --no-cache add --virtual .build-deps-fonts msttcorefonts-installer fontconfig && \
+    update-ms-fonts && \
+    fc-cache -f && \
+    apk del .build-deps-fonts && \
+    find /usr/share/fonts/truetype/msttcorefonts/ -type l -exec unlink {} \; 2>/dev/null || true
+
+# Install full-icu
+RUN corepack enable && npm install -g full-icu@1.5.0
+
+ENV NODE_ICU_DATA=/usr/local/lib/node_modules/full-icu
+
+WORKDIR /home/node
+
+# Copy compiled application from builder
+COPY --from=builder --chown=node:node /build/compiled /usr/local/lib/node_modules/n8n
+
+# Copy entrypoint script
+COPY docker/images/n8n/docker-entrypoint.sh /
+
+# Setup n8n
+RUN cd /usr/local/lib/node_modules/n8n && \
+    npm rebuild sqlite3 && \
+    ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
+    mkdir -p /home/node/.n8n && \
+    chown -R node:node /home/node
+
+# Install canvas for pdfjs if needed
+RUN cd /usr/local/lib/node_modules/n8n/node_modules/pdfjs-dist && \
+    npm install @napi-rs/canvas 2>/dev/null || true
+
+# Expose port
+EXPOSE 5678
+
+# Switch to node user
+USER node
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --spider -q http://localhost:5678/healthz || exit 1
+
+# Entrypoint
+ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
+
+LABEL org.opencontainers.image.title="n8n" \
+      org.opencontainers.image.description="Workflow Automation Tool - Built from Source" \
+      org.opencontainers.image.source="https://github.com/aiappsy/n8n" \
+      org.opencontainers.image.url="https://n8n.io" \
+      org.opencontainers.image.version=${N8N_VERSION}
