@@ -25,6 +25,9 @@ on:
       - 'healthcheck.sh'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-docker-compose:
     name: Validate Docker Compose
