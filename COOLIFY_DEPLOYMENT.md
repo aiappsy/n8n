@@ -369,8 +369,11 @@ In Coolify, you can also view logs directly in the dashboard under your resource
 
 4. **Test local connectivity:**
    ```bash
+   # n8n provides a standard /healthz endpoint for health checks
    curl http://localhost:5678/healthz
    ```
+   
+   Expected response: `{"status":"ok"}`
 
 ### Database Connection Errors
 
@@ -408,9 +411,13 @@ In Coolify, you can also view logs directly in the dashboard under your resource
    - Verify Coolify's proxy is working
 
 3. **Test webhook endpoint:**
+   
+   First, create a test workflow with a webhook trigger in n8n, then test it:
    ```bash
-   curl https://your-domain.com/webhook-test/test
+   curl https://your-domain.com/webhook/your-webhook-path
    ```
+   
+   Replace `your-webhook-path` with the actual webhook path from your workflow.
 
 ### Lost Encryption Key
 
