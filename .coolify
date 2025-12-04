@@ -1,0 +1,18 @@
+# Coolify Configuration File
+# This file helps Coolify automatically detect and configure your application
+
+# Build Configuration
+BUILD_COMMAND=pnpm build
+BUILD_PATH=/home/runner/work/n8n/n8n
+
+# Health Check
+HEALTHCHECK_PATH=/healthz
+
+# Port Configuration
+PORT=5678
+
+# Docker Compose
+DOCKER_COMPOSE_FILE=docker-compose.yml
+
+# Environment Variables Required
+REQUIRED_ENV_VARS=POSTGRES_PASSWORD,N8N_ENCRYPTION_KEY,WEBHOOK_URL

@@ -1,0 +1,251 @@
+name: Validate Coolify Deployment Configuration
+
+on:
+  pull_request:
+    paths:
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - 'Dockerfile.build'
+      - '.env.example'
+      - '.dockerignore'
+      - 'coolify-quickstart.sh'
+      - 'healthcheck.sh'
+      - '.github/workflows/validate-coolify-deployment.yml'
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - 'Dockerfile.build'
+      - '.env.example'
+      - '.dockerignore'
+      - 'coolify-quickstart.sh'
+      - 'healthcheck.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-docker-compose:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test << 'EOF'
+          POSTGRES_PASSWORD=test_password_123
+          N8N_ENCRYPTION_KEY=test_encryption_key_32chars!!
+          WEBHOOK_URL=http://localhost:5678/
+          EOF
+
+      - name: Validate docker-compose.yml syntax
+        run: |
+          docker compose --env-file .env.test config > /dev/null
+          echo "✓ docker-compose.yml is valid"
+
+      - name: Check required services
+        run: |
+          docker compose --env-file .env.test config | grep -q "services:"
+          docker compose --env-file .env.test config | grep -q "postgres:"
+          docker compose --env-file .env.test config | grep -q "n8n:"
+          echo "✓ All required services present"
+
+      - name: Validate health checks
+        run: |
+          docker compose --env-file .env.test config | grep -q "healthcheck:"
+          echo "✓ Health checks configured"
+
+      - name: Clean up
+        run: rm -f .env.test
+
+  validate-dockerfiles:
+    name: Validate Dockerfiles
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dockerfile: ['Dockerfile', 'Dockerfile.build']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate ${{ matrix.dockerfile }} syntax
+        run: |
+          docker build --check -f ${{ matrix.dockerfile }} . 2>&1 | tee build-check.log
+          if grep -q "warning" build-check.log; then
+            echo "⚠️ Warnings found in ${{ matrix.dockerfile }}"
+            exit 1
+          fi
+          echo "✓ ${{ matrix.dockerfile }} is valid"
+
+  validate-scripts:
+    name: Validate Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check script permissions
+        run: |
+          if [ ! -x coolify-quickstart.sh ]; then
+            echo "❌ coolify-quickstart.sh is not executable"
+            exit 1
+          fi
+          if [ ! -x healthcheck.sh ]; then
+            echo "❌ healthcheck.sh is not executable"
+            exit 1
+          fi
+          echo "✓ Scripts are executable"
+
+      - name: Validate bash syntax
+        run: |
+          bash -n coolify-quickstart.sh
+          bash -n healthcheck.sh
+          echo "✓ Script syntax is valid"
+
+      - name: Check for common security issues
+        run: |
+          # Check for hardcoded passwords/keys
+          if grep -rn "password.*=" coolify-quickstart.sh | grep -v "DB_PASSWORD=\|BASIC_AUTH_PASS=\|read -"; then
+            echo "⚠️ Potential hardcoded password found"
+            exit 1
+          fi
+          echo "✓ No obvious security issues"
+
+  validate-env-example:
+    name: Validate Environment Example
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check .env.example exists
+        run: |
+          if [ ! -f .env.example ]; then
+            echo "❌ .env.example not found"
+            exit 1
+          fi
+          echo "✓ .env.example exists"
+
+      - name: Validate required variables documented
+        run: |
+          for var in POSTGRES_PASSWORD N8N_ENCRYPTION_KEY WEBHOOK_URL; do
+            if ! grep -q "$var=" .env.example; then
+              echo "❌ Required variable $var not found in .env.example"
+              exit 1
+            fi
+          done
+          echo "✓ All required variables documented"
+
+      - name: Check for sensitive data
+        run: |
+          # Ensure no real passwords or keys in example file
+          if grep -E "password.*[a-zA-Z0-9]{16,}" .env.example | grep -v "change_this\|your_\|example"; then
+            echo "⚠️ Potential real password in .env.example"
+            exit 1
+          fi
+          echo "✓ No sensitive data in example file"
+
+  validate-documentation:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check documentation files exist
+        run: |
+          for file in README-COOLIFY.md DEPLOYMENT.md CONTRIBUTING-COOLIFY.md; do
+            if [ ! -f "$file" ]; then
+              echo "❌ $file not found"
+              exit 1
+            fi
+          done
+          echo "✓ All documentation files present"
+
+      - name: Check for broken internal links
+        run: |
+          # Check if referenced files exist
+          for file in README-COOLIFY.md DEPLOYMENT.md; do
+            # Extract markdown links to local files
+            grep -oP '\[.*?\]\(\K[^)]*(?=\))' "$file" | grep -v "^http" | grep -v "^#" | while read -r link; do
+              if [ ! -f "$link" ] && [ ! -d "$link" ]; then
+                echo "⚠️ Broken link in $file: $link"
+              fi
+            done
+          done
+          echo "✓ Documentation links validated"
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create test environment
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_DB=n8n_test
+          POSTGRES_USER=n8n_test
+          POSTGRES_PASSWORD=test_password_123456
+          N8N_ENCRYPTION_KEY=test_encryption_key_exactly_32_chars
+          WEBHOOK_URL=http://localhost:5678/
+          N8N_PROTOCOL=http
+          EOF
+
+      - name: Start services
+        run: |
+          docker compose up -d
+          echo "✓ Services started"
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker compose exec postgres pg_isready -U n8n_test; do sleep 2; done'
+          echo "✓ PostgreSQL is healthy"
+          
+          echo "Waiting for n8n..."
+          timeout 120 bash -c 'until curl -sf http://localhost:5678/healthz > /dev/null; do sleep 5; done'
+          echo "✓ n8n is healthy"
+
+      - name: Test n8n API
+        run: |
+          # Test health endpoint
+          curl -f http://localhost:5678/healthz
+          echo "✓ n8n health check passed"
+
+      - name: Check logs for errors
+        run: |
+          docker compose logs n8n | grep -i "error" || true
+          docker compose logs postgres | grep -i "error" || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+          rm -f .env
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-docker-compose, validate-dockerfiles, validate-scripts, validate-env-example, validate-documentation]
+    if: always()
+    steps:
+      - name: Check all validations passed
+        run: |
+          if [ "${{ needs.validate-docker-compose.result }}" != "success" ] || \
+             [ "${{ needs.validate-dockerfiles.result }}" != "success" ] || \
+             [ "${{ needs.validate-scripts.result }}" != "success" ] || \
+             [ "${{ needs.validate-env-example.result }}" != "success" ] || \
+             [ "${{ needs.validate-documentation.result }}" != "success" ]; then
+            echo "❌ Some validations failed"
+            exit 1
+          fi
+          echo "✅ All Coolify deployment validations passed!"
