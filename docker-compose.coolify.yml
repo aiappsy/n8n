@@ -83,6 +83,8 @@ services:
         condition: service_healthy
     
     healthcheck:
+      # Note: Health check uses HTTP for localhost internal connectivity test
+      # This is intentional and secure as it only checks the internal container port
       test: ['CMD-SHELL', 'wget --spider -q http://localhost:5678/healthz || exit 1']
       interval: 30s
       timeout: 10s

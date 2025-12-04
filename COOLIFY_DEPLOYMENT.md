@@ -507,7 +507,7 @@ If an upgrade causes issues:
 
 1. **Change image tag** to previous version:
    ```yaml
-   image: ghcr.io/n8n-io/n8n:0.235.0  # Previous working version
+   image: ghcr.io/n8n-io/n8n:1.0.0  # Replace with your previous working version
    ```
 
 2. **Redeploy in Coolify**
