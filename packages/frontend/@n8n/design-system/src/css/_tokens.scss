@@ -128,20 +128,19 @@
 	/* stylelint-disable-next-line @n8n/css-var-naming */
 	--color--background--light-3: var(--color-background-xlight, var(--color--neutral-white));
 
-	/* stylelint-disable-next-line @n8n/css-var-naming */
 	--shadow: var(
 		--box-shadow-base,
-		0 2px 4px var(--color--black-alpha-200),
-		0 0 6px var(--color--black-alpha-100)
+		0 1px 2px 0 rgba(60, 64, 67, 0.3),
+		0 1px 3px 1px rgba(60, 64, 67, 0.15)
 	);
 	--shadow--dark: var(
 		/* stylelint-disable-next-line @n8n/css-var-naming */ --box-shadow-dark,
-		0 2px 4px var(--color--black-alpha-200),
-		0 0 6px var(--color--black-alpha-200)
+		0 4px 6px 0 rgba(0, 0, 0, 0.3),
+		0 1px 3px 0 rgba(0, 0, 0, 0.15)
 	);
 	/* stylelint-disable-next-line @n8n/css-var-naming */
-	--shadow--light: var(--box-shadow-light, 0 2px 12px 0 var(--color--black-alpha-100));
-	--shadow--card-hover: 0 2px 8px rgba(68, 28, 23, 0.1);
+	--shadow--light: var(--box-shadow-light, 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 1px 3px 1px rgba(0, 0, 0, 0.1));
+	--shadow--card-hover: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
 
 	/* stylelint-disable-next-line @n8n/css-var-naming */
 	--radius--xl: var(--border-radius-xlarge, 12px);

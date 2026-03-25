@@ -57,9 +57,9 @@ onMounted(() => {
 </script>
 
 <template>
-	<div :class="containerClasses" data-test-id="n8n-logo">
-		<LogoIcon ref="logo" :class="$style.logo" />
-		<LogoText v-if="showLogoText" :class="$style.logoText" />
+	<div :class="containerClasses" data-test-id="Aippsyflow-logo">
+		<img ref="logo" :src="LogoIcon" :class="$style.logo" alt="Aippsyflow Icon" />
+		<img v-if="showLogoText" :src="LogoText" :class="$style.logoText" alt="Aippsyflow" />
 		<slot />
 	</div>
 </template>
